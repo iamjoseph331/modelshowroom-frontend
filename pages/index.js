@@ -8,7 +8,7 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>JCV Model Visualization Platform</title>
+        <title>Model Showroom</title>
         <meta name="description" content="Upload images and visualize model predictions." />
         <link rel="icon" href="/favicon.ico" />
       </Head>

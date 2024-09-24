@@ -1,21 +1,28 @@
 // components/ImageUpload.js
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
-import styles from './ImageUpload.module.css'; // Import the CSS module
+import styles from './ImageUpload.module.css'; // Ensure correct path
 
 const ImageUpload = () => {
-  const [tasks, setTasks] = useState({}); // Stores tasks and their models
-  const [selectedTask, setSelectedTask] = useState(''); // Currently selected task
-  const [selectedModel, setSelectedModel] = useState(''); // Currently selected model
+  // State management
+  const [tasks, setTasks] = useState({});
+  const [selectedTask, setSelectedTask] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null); // Image preview URL
+  const [imagePreview, setImagePreview] = useState(null);
   const [metadataFile, setMetadataFile] = useState(null);
   const [results, setResults] = useState(null);
   const [logs, setLogs] = useState('');
   const [loading, setLoading] = useState(false);
+  const [boundingBoxes, setBoundingBoxes] = useState([]);
+  const [scores, setScores] = useState([]); // To store confidence scores
 
+  // Ref to access the image DOM element
+  const imageRef = useRef(null);
+
+  // Backend API base URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
   // Fetch available tasks and models from the backend on component mount
@@ -47,7 +54,7 @@ const ImageUpload = () => {
     }
   }, [selectedTask, tasks]);
 
-  // Handle image drop
+  // Handle image drop via react-dropzone
   const onDrop = (acceptedFiles, fileRejections) => {
     // Handle rejected files
     if (fileRejections.length > 0) {
@@ -84,7 +91,7 @@ const ImageUpload = () => {
     multiple: false,
   });
 
-  // Handle metadata upload
+  // Handle metadata upload (optional)
   const handleMetadataUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -111,6 +118,7 @@ const ImageUpload = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    // Basic validations
     if (!imageFile) {
       setLogs((prev) => prev + 'Please upload an image.\n');
       return;
@@ -129,8 +137,11 @@ const ImageUpload = () => {
     setLoading(true);
     setLogs('');
     setResults(null);
+    setBoundingBoxes([]); // Reset previous bounding boxes
+    setScores([]); // Reset previous scores
 
     try {
+      // Convert image and metadata to appropriate formats
       const imageBase64 = await fileToBase64(imageFile);
       let metadataContent = '';
 
@@ -143,6 +154,7 @@ const ImageUpload = () => {
         });
       }
 
+      // Prepare payload
       const payload = {
         mdl_name: selectedModel,
         cv_task: selectedTask,
@@ -152,10 +164,35 @@ const ImageUpload = () => {
 
       setLogs((prev) => prev + 'Sending prediction request...\n');
 
+      // Send POST request to backend
       const response = await axios.post(`${API_BASE_URL}/api/predict`, payload);
 
       setResults(response.data);
       setLogs((prev) => prev + 'Prediction successful.\n');
+
+      // Parse bounding boxes from the response
+      if (response.data.bounding_box) {
+        const parsedBoxes = response.data.bounding_box.map((box) => {
+          if (Array.isArray(box) && box.length === 2) {
+            const topLeft = box[0];
+            const bottomRight = box[1];
+            return {
+              x1: topLeft.x,
+              y1: topLeft.y,
+              x2: bottomRight.x,
+              y2: bottomRight.y,
+            };
+          }
+          return null;
+        }).filter(box => box !== null);
+
+        setBoundingBoxes(parsedBoxes);
+      }
+
+      // Parse scores from the response
+      if (response.data.scores) {
+        setScores(response.data.scores);
+      }
     } catch (error) {
       console.error('Error during prediction:', error);
       setLogs((prev) => prev + `Error: ${error.message}\n`);
@@ -178,7 +215,7 @@ const ImageUpload = () => {
 
   return (
     <div>
-      <h1>Model showroom</h1>
+      <h1>Model Showroom</h1>
 
       <div className={styles.container}>
         {/* Left Column: Drag-and-Drop Area and Image Preview */}
@@ -198,10 +235,53 @@ const ImageUpload = () => {
             </div>
           )}
 
-          {/* Image Preview */}
+          {/* Image Preview with Bounding Boxes */}
           {imagePreview && (
             <div className={styles.imagePreview}>
-              <img src={imagePreview} alt="Selected Preview" />
+              <img
+                src={imagePreview}
+                alt="Selected Preview"
+                className={styles.imagePreviewImg}
+                ref={imageRef}
+              />
+              {/* Overlay Bounding Boxes */}
+              {boundingBoxes.map((box, index) => {
+                const img = imageRef.current;
+                if (!img) return null;
+
+                // Get the displayed image dimensions
+                const { width: imgWidth, height: imgHeight } = img.getBoundingClientRect();
+
+                // Calculate scaling factors based on the natural size vs displayed size
+                const naturalWidth = img.naturalWidth;
+                const naturalHeight = img.naturalHeight;
+                const scaleX = imgWidth / naturalWidth;
+                const scaleY = imgHeight / naturalHeight;
+
+                // Calculate top-left corner and dimensions
+                const x = box.x1 * scaleX;
+                const y = box.y1 * scaleY;
+                const width = (box.x2 - box.x1) * scaleX;
+                const height = (box.y2 - box.y1) * scaleY;
+
+                // Optional: Get the corresponding score
+                const score = scores[index] ? scores[index].toFixed(2) : '';
+
+                return (
+                  <div
+                    key={index}
+                    className={styles.boundingBox}
+                    style={{
+                      left: `${x}px`,
+                      top: `${y}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                    }}
+                  >
+                    {score && <span className={styles.confidenceScore}>{score}</span>}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

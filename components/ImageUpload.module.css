@@ -42,9 +42,15 @@
     width: 100%;
     height: 300px; /* Fixed height */
     border: 1px solid #ccc;
-    display: flex;
+    
+    /* Add position: relative to anchor absolute children */
+    position: relative;
+    
+    /* Remove flexbox properties to prevent layout conflicts */
+    /* display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: center; */
+    
     overflow: hidden;
   }
   
@@ -52,6 +58,30 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+  }
+  
+  /* Bounding Box */
+  .boundingBox {
+    position: absolute;
+    border: 2px solid red;
+    pointer-events: none; /* Allows clicks to pass through */
+    
+    /* Optional Enhancements */
+    background-color: rgba(255, 0, 0, 0.2);
+    transition: all 0.3s ease;
+  }
+  
+  /* Confidence Score */
+  .confidenceScore {
+    position: absolute;
+    top: -20px; /* Position above the bounding box */
+    left: 0;
+    background-color: red;
+    color: white;
+    padding: 2px 4px;
+    font-size: 12px;
+    border-radius: 2px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
   }
   
   /* Logs Section */
