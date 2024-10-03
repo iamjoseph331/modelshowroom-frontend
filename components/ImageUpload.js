@@ -17,13 +17,22 @@ const ImageUpload = () => {
   const [logs, setLogs] = useState('');
   const [loading, setLoading] = useState(false);
   const [boundingBoxes, setBoundingBoxes] = useState([]);
-  const [scores, setScores] = useState([]); // To store confidence scores
+  const [imageTexts, setImageTexts] = useState([]); // To store image_text
+  const [predefinedImages, setPredefinedImages] = useState([]); // List of pre-defined images
 
   // Ref to access the image DOM element
   const imageRef = useRef(null);
 
   // Backend API base URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
+  // Pre-defined images array (ensure these images exist in the public/predefined-images/ folder)
+  const predefinedImageList = [
+    'image1.jpg',
+    'image2.png',
+    'image3.jpeg',
+    // Add more image filenames as needed
+  ];
 
   // Fetch available tasks and models from the backend on component mount
   useEffect(() => {
@@ -45,6 +54,7 @@ const ImageUpload = () => {
     };
 
     fetchModels();
+    setPredefinedImages(predefinedImageList); // Set pre-defined images
   }, [API_BASE_URL]);
 
   // Update selectedModel when selectedTask changes
@@ -100,6 +110,30 @@ const ImageUpload = () => {
     }
   };
 
+  // Handle selection of pre-defined image
+  const handlePredefinedImageSelect = (e) => {
+    const selectedImage = e.target.value;
+    if (selectedImage === '') {
+      // Reset to no image selected
+      setImageFile(null);
+      setImagePreview(null);
+      setLogs('');
+      setResults(null);
+      setBoundingBoxes([]);
+      setImageTexts([]);
+      return;
+    }
+
+    // Set the selected image as the preview
+    const imageUrl = `/predefined-images/${selectedImage}`; // Ensure these images are in the public/predefined-images/ folder
+    setImagePreview(imageUrl);
+    setImageFile(null); // Since it's not uploaded, set to null
+    setLogs(`Selected pre-defined image "${selectedImage}"\n`);
+    setResults(null);
+    setBoundingBoxes([]);
+    setImageTexts([]);
+  };
+
   // Convert file to base64 string
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -119,8 +153,8 @@ const ImageUpload = () => {
     event.preventDefault();
 
     // Basic validations
-    if (!imageFile) {
-      setLogs((prev) => prev + 'Please upload an image.\n');
+    if (!imagePreview) {
+      setLogs((prev) => prev + 'Please upload or select an image.\n');
       return;
     }
 
@@ -138,11 +172,31 @@ const ImageUpload = () => {
     setLogs('');
     setResults(null);
     setBoundingBoxes([]); // Reset previous bounding boxes
-    setScores([]); // Reset previous scores
+    setImageTexts([]); // Reset previous image_text
 
     try {
-      // Convert image and metadata to appropriate formats
-      const imageBase64 = await fileToBase64(imageFile);
+      let imageBase64 = '';
+
+      if (imageFile) {
+        // If an image was uploaded
+        imageBase64 = await fileToBase64(imageFile);
+      } else if (imagePreview) {
+        // If a pre-defined image was selected
+        const response = await fetch(imagePreview);
+        const blob = await response.blob();
+        imageBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64data = reader.result.split(',')[1]; // Remove the prefix
+            resolve(base64data);
+          };
+          reader.onerror = () => {
+            reject('Failed to convert image to base64');
+          };
+          reader.readAsDataURL(blob);
+        });
+      }
+
       let metadataContent = '';
 
       if (metadataFile) {
@@ -189,9 +243,9 @@ const ImageUpload = () => {
         setBoundingBoxes(parsedBoxes);
       }
 
-      // Parse scores from the response
-      if (response.data.scores) {
-        setScores(response.data.scores);
+      // Parse image_text from the response
+      if (response.data.image_text) {
+        setImageTexts(response.data.image_text);
       }
     } catch (error) {
       console.error('Error during prediction:', error);
@@ -207,7 +261,7 @@ const ImageUpload = () => {
   // Clean up the image preview URL when the component unmounts or when a new image is uploaded
   useEffect(() => {
     return () => {
-      if (imagePreview) {
+      if (imagePreview && typeof imagePreview === 'object') {
         URL.revokeObjectURL(imagePreview);
       }
     };
@@ -234,6 +288,25 @@ const ImageUpload = () => {
               <strong>Selected Image:</strong> {imageFile.name}
             </div>
           )}
+
+          {/* Pre-defined Image Selection */}
+          <div className={styles.formGroup}>
+            <label htmlFor="predefined-image-select">Or Choose a Pre-defined Image:</label>
+            <select
+              id="predefined-image-select"
+              onChange={handlePredefinedImageSelect}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select an image
+              </option>
+              {predefinedImages.map((imgName, index) => (
+                <option key={index} value={imgName}>
+                  {imgName}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Image Preview with Bounding Boxes */}
           {imagePreview && (
@@ -264,8 +337,8 @@ const ImageUpload = () => {
                 const width = (box.x2 - box.x1) * scaleX;
                 const height = (box.y2 - box.y1) * scaleY;
 
-                // Optional: Get the corresponding score
-                const score = scores[index] ? scores[index].toFixed(2) : '';
+                // Get the corresponding image_text
+                const imageText = imageTexts[index] || '';
 
                 return (
                   <div
@@ -278,7 +351,7 @@ const ImageUpload = () => {
                       height: `${height}px`,
                     }}
                   >
-                    {score && <span className={styles.confidenceScore}>{score}</span>}
+                    {imageText && <span className={styles.confidenceScore}>{imageText}</span>}
                   </div>
                 );
               })}
