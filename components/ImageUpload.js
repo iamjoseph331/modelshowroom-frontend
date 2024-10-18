@@ -291,7 +291,7 @@ const ImageUpload = () => {
 
           {/* Pre-defined Image Selection */}
           <div className={styles.formGroup}>
-            <label htmlFor="predefined-image-select">Or Choose a Pre-defined Image:</label>
+            <label htmlFor="predefined-image-select">Or Choose a Sample Image:</label>
             <select
               id="predefined-image-select"
               onChange={handlePredefinedImageSelect}
