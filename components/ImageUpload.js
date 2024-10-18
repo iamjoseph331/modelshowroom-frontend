@@ -29,8 +29,8 @@ const ImageUpload = () => {
   // Pre-defined images array (ensure these images exist in the public/predefined-images/ folder)
   const predefinedImageList = [
     'image1.jpg',
-    'image2.png',
-    'image3.jpeg',
+    'image2.jpg',
+    'image3.jpg',
     // Add more image filenames as needed
   ];
 
