@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
+import Webcam from 'react-webcam'; // Import react-webcam
 import styles from './ImageUpload.module.css'; // Ensure correct path
 
 const ImageUpload = () => {
@@ -19,9 +20,13 @@ const ImageUpload = () => {
   const [boundingBoxes, setBoundingBoxes] = useState([]);
   const [imageTexts, setImageTexts] = useState([]); // To store image_text
   const [predefinedImages, setPredefinedImages] = useState([]); // List of pre-defined images
+  const [mode, setMode] = useState('upload'); // 'upload', 'predefined', 'camera'
 
   // Ref to access the image DOM element
   const imageRef = useRef(null);
+
+  // Ref for the webcam
+  const webcamRef = useRef(null);
 
   // Backend API base URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
@@ -33,6 +38,9 @@ const ImageUpload = () => {
     'image3.jpg',
     // Add more image filenames as needed
   ];
+
+  // Timer reference for sending images every second
+  const timerRef = useRef(null);
 
   // Fetch available tasks and models from the backend on component mount
   useEffect(() => {
@@ -134,6 +142,102 @@ const ImageUpload = () => {
     setImageTexts([]);
   };
 
+  // Handle mode change
+  const handleModeChange = (selectedMode) => {
+    setMode(selectedMode);
+    setImageFile(null);
+    setImagePreview(null);
+    setLogs('');
+    setResults(null);
+    setBoundingBoxes([]);
+    setImageTexts([]);
+
+    // Clear any existing timers when switching modes
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  // Function to capture image from webcam and send to backend
+  const captureAndSend = async () => {
+    if (webcamRef.current) {
+      const screenshot = webcamRef.current.getScreenshot();
+      if (screenshot) {
+        try {
+          // Convert data URL to base64 string
+          const base64Image = screenshot.split(',')[1];
+
+          // Prepare payload
+          const payload = {
+            mdl_name: selectedModel,
+            cv_task: selectedTask,
+            image: base64Image,
+            metadata: '', // Add metadata if needed
+          };
+
+          // Send POST request to backend
+          const response = await axios.post(`${API_BASE_URL}/api/predict`, payload);
+
+          setResults(response.data);
+          setLogs((prev) => prev + 'Prediction successful.\n');
+
+          // Parse bounding boxes from the response
+          if (response.data.bounding_box) {
+            const parsedBoxes = response.data.bounding_box.map((box) => {
+              if (Array.isArray(box) && box.length === 2) {
+                const topLeft = box[0];
+                const bottomRight = box[1];
+                return {
+                  x1: topLeft.x,
+                  y1: topLeft.y,
+                  x2: bottomRight.x,
+                  y2: bottomRight.y,
+                };
+              }
+              return null;
+            }).filter(box => box !== null);
+
+            setBoundingBoxes(parsedBoxes);
+          }
+
+          // Parse image_text from the response
+          if (response.data.image_text) {
+            setImageTexts(response.data.image_text);
+          }
+        } catch (error) {
+          console.error('Error during prediction:', error);
+          setLogs((prev) => prev + `Error: ${error.message}\n`);
+          if (error.response && error.response.data) {
+            setLogs((prev) => prev + JSON.stringify(error.response.data) + '\n');
+          }
+        }
+      }
+    }
+  };
+
+  // Start sending images every second when in camera mode
+  useEffect(() => {
+    if (mode === 'camera') {
+      // Start interval
+      timerRef.current = setInterval(captureAndSend, 1000); // 1000ms = 1s
+    } else {
+      // Clear interval if not in camera mode
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    // Cleanup on component unmount or mode change
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [mode, selectedModel, selectedTask]);
+
   // Convert file to base64 string
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -152,7 +256,12 @@ const ImageUpload = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    // Basic validations
+    if (mode === 'camera') {
+      setLogs((prev) => prev + 'Camera mode is active. Images are being sent automatically.\n');
+      return; // In camera mode, images are sent automatically via setInterval
+    }
+
+    // Basic validations for upload and predefined modes
     if (!imagePreview) {
       setLogs((prev) => prev + 'Please upload or select an image.\n');
       return;
@@ -271,42 +380,90 @@ const ImageUpload = () => {
     <div>
       <h1>Model Showroom</h1>
 
+      {/* Mode Selection Buttons */}
+      <div className={styles.modeSelection}>
+        <button
+          className={`${styles.modeButton} ${mode === 'upload' ? 'active' : ''}`}
+          onClick={() => handleModeChange('upload')}
+        >
+          Upload Image
+        </button>
+        <button
+          className={`${styles.modeButton} ${mode === 'predefined' ? 'active' : ''}`}
+          onClick={() => handleModeChange('predefined')}
+        >
+          Pre-defined Image
+        </button>
+        <button
+          className={`${styles.modeButton} ${mode === 'camera' ? 'active' : ''}`}
+          onClick={() => handleModeChange('camera')}
+        >
+          Camera Mode
+        </button>
+      </div>
+
       <div className={styles.container}>
-        {/* Left Column: Drag-and-Drop Area and Image Preview */}
+        {/* Left Column: Upload/Pre-defined Image or Camera */}
         <div className={styles.leftColumn}>
-          {/* Drag-and-Drop Area */}
-          <div {...getRootProps()} className={styles.dragDropArea}>
-            <input {...getInputProps()} />
-            {isDragActive ? (
-              <p>Drop the image here ...</p>
-            ) : (
-              <p>Drag 'n' drop an image here, or click to select one</p>
-            )}
-          </div>
-          {imageFile && (
-            <div>
-              <strong>Selected Image:</strong> {imageFile.name}
-            </div>
+          {mode === 'upload' && (
+            <>
+              {/* Drag-and-Drop Area */}
+              <div {...getRootProps()} className={styles.dragDropArea}>
+                <input {...getInputProps()} />
+                {isDragActive ? (
+                  <p>Drop the image here ...</p>
+                ) : (
+                  <p>Drag 'n' drop an image here, or click to select one</p>
+                )}
+              </div>
+              {imageFile && (
+                <div>
+                  <strong>Selected Image:</strong> {imageFile.name}
+                </div>
+              )}
+            </>
           )}
 
-          {/* Pre-defined Image Selection */}
-          <div className={styles.formGroup}>
-            <label htmlFor="predefined-image-select">Or Choose a Sample Image:</label>
-            <select
-              id="predefined-image-select"
-              onChange={handlePredefinedImageSelect}
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select an image
-              </option>
-              {predefinedImages.map((imgName, index) => (
-                <option key={index} value={imgName}>
-                  {imgName}
-                </option>
-              ))}
-            </select>
-          </div>
+          {mode === 'predefined' && (
+            <>
+              {/* Pre-defined Image Selection */}
+              <div className={styles.formGroup}>
+                <label htmlFor="predefined-image-select">Choose a Pre-defined Image:</label>
+                <select
+                  id="predefined-image-select"
+                  onChange={handlePredefinedImageSelect}
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Select an image
+                  </option>
+                  {predefinedImages.map((imgName, index) => (
+                    <option key={index} value={imgName}>
+                      {imgName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {mode === 'camera' && (
+            <>
+              {/* Webcam Feed */}
+              <div className={styles.cameraContainer}>
+                <Webcam
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  className={styles.webcamFeed}
+                  videoConstraints={{
+                    facingMode: 'user', // Front-facing camera
+                  }}
+                />
+              </div>
+              <p>Camera mode is active. Images are being sent every second.</p>
+            </>
+          )}
 
           {/* Image Preview with Bounding Boxes */}
           {imagePreview && (
@@ -426,12 +583,14 @@ const ImageUpload = () => {
 
             {/* Submit Button */}
             <div className={styles.formGroup}>
-              <button type="submit" className={styles.submitButton} disabled={loading}>
+              <button type="submit" className={styles.submitButton} disabled={loading || mode === 'camera'}>
                 {loading ? (
                   <>
                     Processing...
                     <div className={styles.spinner}></div>
                   </>
+                ) : mode === 'camera' ? (
+                  'Camera Active'
                 ) : (
                   'Upload and Predict'
                 )}

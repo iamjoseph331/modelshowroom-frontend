@@ -7,171 +7,225 @@
     margin-top: 20px;
   }
   
-  /* Left Column Styles */
-  .leftColumn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+/* Left Column Styles */
+.leftColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Right Column Styles */
+.rightColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Gap between elements within the right column */
+}
+
+/* Drag-and-Drop Area */
+.dragDropArea {
+  border: 2px dashed #cccccc;
+  padding: 20px;
+  text-align: center;
+  width: 100%;
+  height: 300px; /* Fixed height for consistency */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Image Preview */
+.imagePreview {
+  margin-top: 20px;
+  width: 100%;
+  height: 300px; /* Fixed height */
+  border: 1px solid #ccc;
   
-  /* Right Column Styles */
+  /* Add position: relative to anchor absolute children */
+  position: relative;
+  
+  /* Remove flexbox properties to prevent layout conflicts */
+  /* display: flex;
+  align-items: center;
+  justify-content: center; */
+  
+  overflow: hidden;
+}
+
+.imagePreview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Bounding Box */
+.boundingBox {
+  position: absolute;
+  border: 2px solid red;
+  pointer-events: none; /* Allows clicks to pass through */
+  
+  /* Optional Enhancements */
+  background-color: rgba(255, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+/* Confidence Score */
+.confidenceScore {
+  position: absolute;
+  top: -20px; /* Position above the bounding box */
+  left: 0;
+  background-color: red;
+  color: white;
+  padding: 2px 4px;
+  font-size: 12px;
+  border-radius: 2px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Logs Section */
+.logs {
+  background-color: #f4f4f4;
+  padding: 10px;
+  height: 150px; /* Fixed height */
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+}
+
+/* Results Section */
+.results {
+  background-color: #f4f4f4;
+  padding: 10px;
+  height: 150px; /* Fixed height */
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+}
+
+/* Form Group Styles */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup label {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.formGroup select,
+.formGroup input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Submit Button Styles */
+.submitButton {
+  padding: 10px 20px;
+  background-color: #0070f3;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.submitButton:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+/* Spinner for Loading State */
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ffffff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 2s linear infinite;
+  margin-left: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .leftColumn,
   .rightColumn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 20px; /* Gap between elements within the right column */
-  }
-  
-  /* Drag-and-Drop Area */
-  .dragDropArea {
-    border: 2px dashed #cccccc;
-    padding: 20px;
-    text-align: center;
     width: 100%;
-    height: 300px; /* Fixed height for consistency */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
   }
-  
-  /* Image Preview */
+
+  .dragDropArea,
   .imagePreview {
-    margin-top: 20px;
-    width: 100%;
-    height: 300px; /* Fixed height */
-    border: 1px solid #ccc;
-    
-    /* Add position: relative to anchor absolute children */
-    position: relative;
-    
-    /* Remove flexbox properties to prevent layout conflicts */
-    /* display: flex;
-    align-items: center;
-    justify-content: center; */
-    
-    overflow: hidden;
+    height: 200px; /* Adjust height for smaller screens */
   }
-  
-  .imagePreview img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
-  
-  /* Bounding Box */
-  .boundingBox {
-    position: absolute;
-    border: 2px solid red;
-    pointer-events: none; /* Allows clicks to pass through */
-    
-    /* Optional Enhancements */
-    background-color: rgba(255, 0, 0, 0.2);
-    transition: all 0.3s ease;
-  }
-  
-  /* Confidence Score */
-  .confidenceScore {
-    position: absolute;
-    top: -20px; /* Position above the bounding box */
-    left: 0;
-    background-color: red;
-    color: white;
-    padding: 2px 4px;
-    font-size: 12px;
-    border-radius: 2px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  }
-  
-  /* Logs Section */
-  .logs {
-    background-color: #f4f4f4;
-    padding: 10px;
-    height: 150px; /* Fixed height */
-    overflow-y: scroll;
-    border: 1px solid #ccc;
-  }
-  
-  /* Results Section */
+
+  .logs,
   .results {
-    background-color: #f4f4f4;
-    padding: 10px;
-    height: 150px; /* Fixed height */
-    overflow-y: scroll;
-    border: 1px solid #ccc;
+    height: 100px; /* Adjust heights for smaller screens */
   }
-  
-  /* Form Group Styles */
-  .formGroup {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .formGroup label {
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
-  .formGroup select,
-  .formGroup input {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  
-  /* Submit Button Styles */
-  .submitButton {
-    padding: 10px 20px;
-    background-color: #0070f3;
-    border: none;
-    color: white;
-    cursor: pointer;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-  }
-  
-  .submitButton:disabled {
-    background-color: #999;
-    cursor: not-allowed;
-  }
-  
-  /* Spinner for Loading State */
-  .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #ffffff;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    animation: spin 2s linear infinite;
-    margin-left: 10px;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .container {
-      flex-direction: column;
-    }
-  
-    .leftColumn,
-    .rightColumn {
-      width: 100%;
-    }
-  
-    .dragDropArea,
-    .imagePreview {
-      height: 200px; /* Adjust height for smaller screens */
-    }
-  
-    .logs,
-    .results {
-      height: 100px; /* Adjust heights for smaller screens */
-    }
-  }
-  
+}
+
+.imagePreviewImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1); /* Mirror the image */
+}
+
+/* Camera Container */
+.cameraContainer {
+  position: relative;
+  width: 100%;
+  height: 300px; /* Match the height of imagePreview */
+  border: 1px solid #ccc;
+  margin-top: 20px;
+  overflow: hidden;
+}
+
+/* Mirrored Webcam Feed */
+.webcamFeed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* Mirror the webcam feed */
+}
+
+/* Predefined Image Select Dropdown */
+.predefinedImageSelect {
+  margin-top: 10px;
+}
+
+/* Mode Selection Buttons */
+.modeSelection {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.modeButton {
+  padding: 10px 20px;
+  background-color: #0070f3;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.modeButton.active {
+  background-color: #005bb5;
+}
+
+.modeButton:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
