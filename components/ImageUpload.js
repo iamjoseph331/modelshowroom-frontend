@@ -505,7 +505,7 @@ const ImageUpload = () => {
 
           {mode === 'camera' && (
             <>
-              {/* Webcam Feed */}
+              {/* Webcam Feed with Overlay */}
               {cameraActive && (
                 <div className={styles.cameraContainer}>
                   <Webcam
@@ -519,6 +519,12 @@ const ImageUpload = () => {
                       height: 300, // Square height
                     }}
                   />
+                  {/* Overlay for Image Text */}
+                  {imageTexts.length > 0 && (
+                    <div className={styles.centeredTextOverlay}>
+                      {imageTexts.join(', ')}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -544,8 +550,8 @@ const ImageUpload = () => {
             </>
           )}
 
-          {/* Image Preview with Bounding Boxes or Centered Text */}
-          {imagePreview && (
+          {/* Image Preview with Bounding Boxes or Centered Text (for Upload and Pre-defined modes) */}
+          {mode !== 'camera' && imagePreview && (
             <div className={styles.imagePreview}>
               <img
                 src={imagePreview}
