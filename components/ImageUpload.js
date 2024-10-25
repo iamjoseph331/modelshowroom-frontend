@@ -21,16 +21,19 @@ const ImageUpload = () => {
   const [imageTexts, setImageTexts] = useState([]); // To store image_text
   const [predefinedImages, setPredefinedImages] = useState([]); // List of pre-defined images
   const [mode, setMode] = useState('upload'); // 'upload', 'predefined', 'camera'
-
-  // Ref to access the image DOM element
+  
+  // New state variables for camera control
+  const [facingMode, setFacingMode] = useState('user'); // 'user' or 'environment'
+  const [cameraActive, setCameraActive] = useState(false); // Whether the camera is active
+  
+  // Refs
   const imageRef = useRef(null);
-
-  // Ref for the webcam
   const webcamRef = useRef(null);
-
+  const timerRef = useRef(null);
+  
   // Backend API base URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6370';
+  
   // Pre-defined images array (ensure these images exist in the public/predefined-images/ folder)
   const predefinedImageList = [
     'image1.jpg',
@@ -38,9 +41,6 @@ const ImageUpload = () => {
     'image3.jpg',
     // Add more image filenames as needed
   ];
-
-  // Timer reference for sending images every second
-  const timerRef = useRef(null);
 
   // Fetch available tasks and models from the backend on component mount
   useEffect(() => {
@@ -151,17 +151,53 @@ const ImageUpload = () => {
     setResults(null);
     setBoundingBoxes([]);
     setImageTexts([]);
+    setFacingMode('user'); // Reset to front-facing camera
+    setCameraActive(false); // Deactivate camera
 
     // Clear any existing timers when switching modes
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
+    // Stop webcam stream if active
+    if (webcamRef.current && webcamRef.current.stream) {
+      webcamRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  // Start the camera
+  const startCamera = () => {
+    setCameraActive(true);
+    setLogs((prev) => prev + 'Camera started.\n');
+  };
+
+  // Stop the camera
+  const stopCamera = () => {
+    setCameraActive(false);
+    setLogs((prev) => prev + 'Camera stopped.\n');
+
+    // Stop webcam stream
+    if (webcamRef.current && webcamRef.current.stream) {
+      webcamRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+
+    // Clear image preview and results
+    setImagePreview(null);
+    setResults(null);
+    setBoundingBoxes([]);
+    setImageTexts([]);
+  };
+
+  // Switch camera between front and back
+  const switchCamera = () => {
+    setFacingMode((prevMode) => (prevMode === 'user' ? 'environment' : 'user'));
+    setLogs((prev) => prev + `Switched to ${facingMode === 'user' ? 'back' : 'front'}-facing camera.\n`);
   };
 
   // Function to capture image from webcam and send to backend
   const captureAndSend = async () => {
-    if (webcamRef.current) {
+    if (webcamRef.current && cameraActive) {
       const screenshot = webcamRef.current.getScreenshot();
       if (screenshot) {
         try {
@@ -199,11 +235,15 @@ const ImageUpload = () => {
             }).filter(box => box !== null);
 
             setBoundingBoxes(parsedBoxes);
+          } else {
+            setBoundingBoxes([]); // Ensure boundingBoxes is empty if not present
           }
 
           // Parse image_text from the response
           if (response.data.image_text) {
             setImageTexts(response.data.image_text);
+          } else {
+            setImageTexts([]); // Ensure imageTexts is empty if not present
           }
         } catch (error) {
           console.error('Error during prediction:', error);
@@ -216,27 +256,39 @@ const ImageUpload = () => {
     }
   };
 
-  // Start sending images every second when in camera mode
+  // Start sending images every second when camera is active
   useEffect(() => {
-    if (mode === 'camera') {
+    if (mode === 'camera' && cameraActive) {
       // Start interval
       timerRef.current = setInterval(captureAndSend, 1000); // 1000ms = 1s
+      setLogs((prev) => prev + 'Image capture started (1 image/sec).\n');
     } else {
-      // Clear interval if not in camera mode
+      // Clear interval if not in camera mode or camera is inactive
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+        setLogs((prev) => prev + 'Image capture stopped.\n');
       }
     }
 
-    // Cleanup on component unmount or mode change
+    // Cleanup on component unmount or when dependencies change
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [mode, selectedModel, selectedTask]);
+  }, [mode, cameraActive, selectedModel, selectedTask]);
+
+  // Stop webcam when not in camera mode
+  useEffect(() => {
+    if (mode !== 'camera' && webcamRef.current) {
+      const stream = webcamRef.current.stream;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  }, [mode]);
 
   // Convert file to base64 string
   const fileToBase64 = (file) => {
@@ -350,11 +402,15 @@ const ImageUpload = () => {
         }).filter(box => box !== null);
 
         setBoundingBoxes(parsedBoxes);
+      } else {
+        setBoundingBoxes([]); // Ensure boundingBoxes is empty if not present
       }
 
       // Parse image_text from the response
       if (response.data.image_text) {
         setImageTexts(response.data.image_text);
+      } else {
+        setImageTexts([]); // Ensure imageTexts is empty if not present
       }
     } catch (error) {
       console.error('Error during prediction:', error);
@@ -450,22 +506,45 @@ const ImageUpload = () => {
           {mode === 'camera' && (
             <>
               {/* Webcam Feed */}
-              <div className={styles.cameraContainer}>
-                <Webcam
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  className={styles.webcamFeed}
-                  videoConstraints={{
-                    facingMode: 'user', // Front-facing camera
-                  }}
-                />
+              {cameraActive && (
+                <div className={styles.cameraContainer}>
+                  <Webcam
+                    audio={false}
+                    ref={webcamRef}
+                    screenshotFormat="image/jpeg"
+                    className={styles.webcamFeed}
+                    videoConstraints={{
+                      facingMode: facingMode, // 'user' or 'environment'
+                      width: 300, // Square width
+                      height: 300, // Square height
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Camera Control Buttons */}
+              <div className={styles.cameraControls}>
+                {!cameraActive ? (
+                  <button onClick={startCamera} className={styles.cameraButton}>
+                    Start Camera
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={stopCamera} className={`${styles.cameraButton} ${styles.stop}`}>
+                      Stop Camera
+                    </button>
+                    <button onClick={switchCamera} className={`${styles.cameraButton} ${styles.switch}`}>
+                      Switch Camera
+                    </button>
+                  </>
+                )}
               </div>
-              <p>Camera mode is active. Images are being sent every second.</p>
+
+              <p>Camera mode is active. Images are being sent once per second when the camera is started.</p>
             </>
           )}
 
-          {/* Image Preview with Bounding Boxes */}
+          {/* Image Preview with Bounding Boxes or Centered Text */}
           {imagePreview && (
             <div className={styles.imagePreview}>
               <img
@@ -474,44 +553,53 @@ const ImageUpload = () => {
                 className={styles.imagePreviewImg}
                 ref={imageRef}
               />
-              {/* Overlay Bounding Boxes */}
-              {boundingBoxes.map((box, index) => {
-                const img = imageRef.current;
-                if (!img) return null;
+              {/* Overlay Bounding Boxes or Centered Text */}
+              {boundingBoxes.length > 0 ? (
+                boundingBoxes.map((box, index) => {
+                  const img = imageRef.current;
+                  if (!img) return null;
 
-                // Get the displayed image dimensions
-                const { width: imgWidth, height: imgHeight } = img.getBoundingClientRect();
+                  // Get the displayed image dimensions
+                  const { width: imgWidth, height: imgHeight } = img.getBoundingClientRect();
 
-                // Calculate scaling factors based on the natural size vs displayed size
-                const naturalWidth = img.naturalWidth;
-                const naturalHeight = img.naturalHeight;
-                const scaleX = imgWidth / naturalWidth;
-                const scaleY = imgHeight / naturalHeight;
+                  // Calculate scaling factors based on the natural size vs displayed size
+                  const naturalWidth = img.naturalWidth;
+                  const naturalHeight = img.naturalHeight;
+                  const scaleX = imgWidth / naturalWidth;
+                  const scaleY = imgHeight / naturalHeight;
 
-                // Calculate top-left corner and dimensions
-                const x = box.x1 * scaleX;
-                const y = box.y1 * scaleY;
-                const width = (box.x2 - box.x1) * scaleX;
-                const height = (box.y2 - box.y1) * scaleY;
+                  // Calculate top-left corner and dimensions
+                  const x = box.x1 * scaleX;
+                  const y = box.y1 * scaleY;
+                  const width = (box.x2 - box.x1) * scaleX;
+                  const height = (box.y2 - box.y1) * scaleY;
 
-                // Get the corresponding image_text
-                const imageText = imageTexts[index] || '';
+                  // Get the corresponding image_text
+                  const imageText = imageTexts[index] || '';
 
-                return (
-                  <div
-                    key={index}
-                    className={styles.boundingBox}
-                    style={{
-                      left: `${x}px`,
-                      top: `${y}px`,
-                      width: `${width}px`,
-                      height: `${height}px`,
-                    }}
-                  >
-                    {imageText && <span className={styles.confidenceScore}>{imageText}</span>}
+                  return (
+                    <div
+                      key={index}
+                      className={styles.boundingBox}
+                      style={{
+                        left: `${x}px`,
+                        top: `${y}px`,
+                        width: `${width}px`,
+                        height: `${height}px`,
+                      }}
+                    >
+                      {imageText && <span className={styles.confidenceScore}>{imageText}</span>}
+                    </div>
+                  );
+                })
+              ) : (
+                /* If no bounding boxes, display image_text at the center */
+                imageTexts.length > 0 && (
+                  <div className={styles.centeredTextOverlay}>
+                    {imageTexts.join(', ')}
                   </div>
-                );
-              })}
+                )
+              )}
             </div>
           )}
         </div>
