@@ -546,7 +546,7 @@ const ImageUpload = () => {
                 )}
               </div>
 
-              <p>Camera mode is active. Images are being sent once per second when the camera is started.</p>
+              <p>Camera mode is active. Images are being sent once per second when the camera is started. We will store the images in cloud with restricted access for model improvement purposes.</p>
             </>
           )}
 
